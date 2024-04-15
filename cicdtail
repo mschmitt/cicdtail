@@ -83,4 +83,6 @@ while True:
         if primed is not True:
             print(f"Waiting for new status updates.")
             primed = True
-        ic(time.sleep(5))
+        for i in [ '█', '▇', '▆', '▅', '▄', '▃', '▂', '▁' ]:
+            print(f"{i}\b", end='', flush=True)
+            time.sleep(0.5)
