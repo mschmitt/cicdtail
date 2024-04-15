@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import yaml, gitlab, argparse, pprint, time, dateutil.parser, termcolor
+import sys, yaml, github, gitlab, argparse, pprint, time, dateutil.parser, termcolor
 
 # Gracefully degrading icecream import https://github.com/gruns/icecream?tab=readme-ov-file#import-tricks
 try:
@@ -33,17 +33,26 @@ print(f"Loaded configuration from: {args.cfg}")
 ic('Top level configuration keys:', configuration.keys())
 
 gitlab_handle = {}
+github_handle = {}
 for name, conf in configuration.items():
     print(f"Processing configuration section: {name}")
     ic(name, conf)
     if conf['type'] == 'gitlab':
         gitlab_handle[name] = gitlab.Gitlab(conf['url'], private_token=conf['token'])
+    elif conf['type'] == 'github':
+        github_handle[name] = ic(github.Github(base_url=conf['url'], login_or_token=conf['token']))
 
 gitlab_watched = set()
+github_watched = set()
 out_seen = set()
 primed = False # Don't print initial batch of jobs
 while True:
-    # Populate/update list of projects the user has access to:
+    for name, handle in github_handle.items():
+        for repo in handle.get_user().get_repos():
+            if repo.name not in github_watched:
+                ic(github_watched.add(repo.name))
+                # print(f"Watching repo {repo.name} on {name}.")
+
     for name, handle in gitlab_handle.items():
         try:
             handle.auth()
@@ -54,7 +63,7 @@ while True:
         for project in handle.projects.list(min_access_level=30, get_all=True):
             if project not in gitlab_watched:
                 ic(gitlab_watched.add(project))
-                print(f"Watching project: {project.path_with_namespace}")
+                print(f"Watching project {project.path_with_namespace} on {name}.")
 
         for project in gitlab_watched:
             projectname = project.path
@@ -80,9 +89,9 @@ while True:
                     else:
                         print(out)
                 out_seen.add(out)
-        if primed is not True:
-            print(f"Waiting for new status updates.")
-            primed = True
-        for i in [ '█', '▇', '▆', '▅', '▄', '▃', '▂', '▁' ]:
-            print(f"{i}\b", end='', flush=True)
-            time.sleep(0.5)
+    if primed is not True:
+        print(f"Waiting for new status updates.")
+        primed = True
+    for i in [ '█', '▇', '▆', '▅', '▄', '▃', '▂', '▁' ]:
+        print(f"{i}\b", end='', flush=True)
+        time.sleep(0.5)
