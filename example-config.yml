@@ -1,0 +1,6 @@
+---
+my-corpo-gitlab:
+  type: 'gitlab'
+  url: 'https://git.example.com'
+  token: 'glpat-asdfjkl['
+# vim: filetype=yaml

@@ -1,0 +1,73 @@
+#!/usr/bin/env python3
+
+import yaml, gitlab, argparse, pprint, time, dateutil.parser
+
+# Gracefully degrading icecream import https://github.com/gruns/icecream?tab=readme-ov-file#import-tricks
+try:
+    from icecream import ic
+    ic.configureOutput(includeContext=True, argToStringFunction = lambda *args: pprint.pformat(*args, width=1000))
+except ImportError:
+    ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)
+
+parser = argparse.ArgumentParser(description='cicdtail - tail progress on CI/CD pipelines')
+parser.add_argument('-v', '--verbose', '--debug', action='store_true', help='Verbose/Debug output')
+parser.add_argument('cfg', metavar='cfg.yml', help='configuration file')
+args = parser.parse_args()
+
+if args.verbose is not True:
+    try:
+        ic.disable()
+    except:
+        pass
+
+ic('Load config from file')
+try:
+    with open(args.cfg, 'r') as cffile:
+        configuration = yaml.safe_load(cffile)
+        cffile.close()
+except Exception as e:
+    print(f"Failed to open configuration file:\n{e}")
+    sys.exit(255)
+
+print(f"Loaded configuration from: {args.cfg}")
+ic('Top level configuration keys:', configuration.keys())
+
+gitlab_handle = {}
+for name, conf in configuration.items():
+    print(f"Processing configuration section: {name}")
+    ic(name, conf)
+    if conf['type'] == 'gitlab':
+        gitlab_handle[name] = gitlab.Gitlab(conf['url'], private_token=conf['token'])
+        try:
+            gitlab_handle[name].auth()
+        except Exception as e:
+            print(f"Failed to authenticate to gitlab at {conf['url']}: {e}")
+
+gitlab_watched = set()
+out_seen = set()
+primed = False # Don't print initial batch of jobs
+while True:
+    # Populate/update list of watched objects from events on the user object
+    for event in gitlab_handle[name].events.list():
+        project_id = event.attributes['project_id']
+        gitlab_watched.add(gitlab_handle[name].projects.get(project_id))
+
+    for project in gitlab_watched:
+        projectname = project.name
+        for job in project.jobs.list():
+            jobname = job.name
+            jobid = job.id
+            status = job.status
+            ref = job.ref
+            title = job.commit['title']
+            commit = job.commit['short_id']
+            timestamp = ic(dateutil.parser.parse(job.created_at))
+            # Todo: Ordering of output is a mess. Maybe sort by job id
+            out = f"{timestamp.strftime('%H:%M:%S')} {projectname} {commit}: \"{title}\" {ref} {jobname}#{jobid} {status}"
+            if(out not in out_seen) and primed is True:
+                print(out)
+            out_seen.add(out)
+    if primed is not True:
+        print(f"Waiting for new status updates.")
+        primed = True
+    ic(time.sleep(5))    
