@@ -38,10 +38,6 @@ for name, conf in configuration.items():
     ic(name, conf)
     if conf['type'] == 'gitlab':
         gitlab_handle[name] = gitlab.Gitlab(conf['url'], private_token=conf['token'])
-        try:
-            gitlab_handle[name].auth()
-        except Exception as e:
-            print(f"Failed to authenticate to gitlab at {conf['url']}: {e}")
 
 gitlab_watched = set()
 out_seen = set()
@@ -49,6 +45,10 @@ primed = False # Don't print initial batch of jobs
 while True:
     # Populate/update list of watched objects from events on the user object
     for name, handle in gitlab_handle.items():
+        try:
+            handle.auth()
+        except Exception as e:
+            print(f"Failed to authenticate to gitlab {name}: {e}")
         for event in handle.events.list():
             project_id = event.attributes['project_id']
             gitlab_watched.add(handle.projects.get(project_id))
