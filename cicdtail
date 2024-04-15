@@ -48,26 +48,27 @@ out_seen = set()
 primed = False # Don't print initial batch of jobs
 while True:
     # Populate/update list of watched objects from events on the user object
-    for event in gitlab_handle[name].events.list():
-        project_id = event.attributes['project_id']
-        gitlab_watched.add(gitlab_handle[name].projects.get(project_id))
+    for name, handle in gitlab_handle.items():
+        for event in handle.events.list():
+            project_id = event.attributes['project_id']
+            gitlab_watched.add(handle.projects.get(project_id))
 
-    for project in gitlab_watched:
-        projectname = project.name
-        for job in project.jobs.list():
-            jobname = job.name
-            jobid = job.id
-            status = job.status
-            ref = job.ref
-            title = job.commit['title']
-            commit = job.commit['short_id']
-            timestamp = ic(dateutil.parser.parse(job.created_at))
-            # Todo: Ordering of output is a mess. Maybe sort by job id
-            out = f"{timestamp.strftime('%H:%M:%S')} {projectname} {commit}: \"{title}\" {ref} {jobname}#{jobid} {status}"
-            if(out not in out_seen) and primed is True:
-                print(out)
-            out_seen.add(out)
-    if primed is not True:
-        print(f"Waiting for new status updates.")
-        primed = True
-    ic(time.sleep(5))    
+        for project in gitlab_watched:
+            projectname = project.name
+            for job in project.jobs.list():
+                jobname = job.name
+                jobid = job.id
+                status = job.status
+                ref = job.ref
+                title = job.commit['title']
+                commit = job.commit['short_id']
+                timestamp = ic(dateutil.parser.parse(job.created_at))
+                # Todo: Ordering of output is a mess. Maybe sort by job id
+                out = f"{timestamp.strftime('%H:%M:%S')} {name} {projectname} {commit}: \"{title}\" {ref} {jobname}#{jobid} {status}"
+                if(out not in out_seen) and primed is True:
+                    print(out)
+                out_seen.add(out)
+        if primed is not True:
+            print(f"Waiting for new status updates.")
+            primed = True
+        ic(time.sleep(5))    
