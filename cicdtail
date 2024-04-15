@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import yaml, gitlab, argparse, pprint, time, dateutil.parser
+import yaml, gitlab, argparse, pprint, time, dateutil.parser, termcolor
 
 # Gracefully degrading icecream import https://github.com/gruns/icecream?tab=readme-ov-file#import-tricks
 try:
@@ -55,20 +55,29 @@ while True:
 
         for project in gitlab_watched:
             projectname = project.name
-            for job in project.jobs.list():
+            for job in sorted(project.jobs.list(), key=lambda job: job.id):
                 jobname = job.name
-                jobid = job.id
                 status = job.status
                 ref = job.ref
                 title = job.commit['title']
                 commit = job.commit['short_id']
-                timestamp = ic(dateutil.parser.parse(job.created_at))
+                if job.finished_at is not None:
+                    timestamp = ic(dateutil.parser.parse(job.finished_at))
+                elif job.started_at is not None:
+                    timestamp = ic(dateutil.parser.parse(job.started_at))
+                else:
+                    timestamp = ic(dateutil.parser.parse(job.created_at))
                 # Todo: Ordering of output is a mess. Maybe sort by job id
-                out = f"{timestamp.strftime('%H:%M:%S')} {name} {projectname} {commit}: \"{title}\" {ref} {jobname}#{jobid} {status}"
+                out = f"{timestamp.strftime('%d.%m.%Y %H:%M:%S')} {projectname} {commit}: \"{title}\" ref={ref} {jobname}/{status}"
                 if(out not in out_seen) and primed is True:
-                    print(out)
+                    if status == 'success':
+                        print(termcolor.colored(out, 'green'))
+                    elif status == 'failed':
+                        print(termcolor.colored(out, 'red'))
+                    else:
+                        print(out)
                 out_seen.add(out)
         if primed is not True:
             print(f"Waiting for new status updates.")
             primed = True
-        ic(time.sleep(5))    
+        ic(time.sleep(5))
