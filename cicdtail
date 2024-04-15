@@ -43,32 +43,35 @@ gitlab_watched = set()
 out_seen = set()
 primed = False # Don't print initial batch of jobs
 while True:
-    # Populate/update list of watched objects from events on the user object
+    # Populate/update list of projects the user has access to:
     for name, handle in gitlab_handle.items():
         try:
             handle.auth()
         except Exception as e:
             print(f"Failed to authenticate to gitlab {name}: {e}")
-        for event in handle.events.list():
-            project_id = event.attributes['project_id']
-            gitlab_watched.add(handle.projects.get(project_id))
+
+        # https://docs.gitlab.com/ee/api/members.html#roles
+        for project in handle.projects.list(min_access_level=30, get_all=True):
+            if project not in gitlab_watched:
+                ic(gitlab_watched.add(project))
+                print(f"Watching project: {project.path_with_namespace}")
 
         for project in gitlab_watched:
-            projectname = project.name
+            projectname = project.path
             for job in sorted(project.jobs.list(), key=lambda job: job.id):
                 jobname = job.name
                 status = job.status
                 ref = job.ref
                 title = job.commit['title']
                 commit = job.commit['short_id']
+                # Pick timestamp furthest along the process
                 if job.finished_at is not None:
                     timestamp = ic(dateutil.parser.parse(job.finished_at))
                 elif job.started_at is not None:
                     timestamp = ic(dateutil.parser.parse(job.started_at))
                 else:
                     timestamp = ic(dateutil.parser.parse(job.created_at))
-                # Todo: Ordering of output is a mess. Maybe sort by job id
-                out = f"{timestamp.strftime('%d.%m.%Y %H:%M:%S')} {projectname} {commit}: \"{title}\" ref={ref} {jobname}/{status}"
+                out = f"{timestamp.strftime('%d.%m.%Y %H:%M:%S')} {projectname} {commit}: \"{title}\" ref={ref} {status}: {jobname}"
                 if(out not in out_seen) and primed is True:
                     if status == 'success':
                         print(termcolor.colored(out, 'green'))
