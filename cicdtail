@@ -39,6 +39,7 @@ for name, conf in configuration.items():
     ic(name, conf)
     if conf['type'] == 'gitlab':
         gitlab_handle[name] = gitlab.Gitlab(conf['url'], private_token=conf['token'])
+        gitlab_handle[name].auth()
         for project_name in conf['projects']:
             ic(project_name)
             try:
@@ -53,7 +54,7 @@ primed = False # Don't print initial batch of jobs
 while True:
     for name, handle in gitlab_handle.items():
         try:
-            handle.auth()
+            ic(handle.auth())
         except Exception as e:
             print(f"Failed to authenticate to gitlab {name}: {e}")
 
@@ -82,7 +83,7 @@ while True:
                         print(out)
                 out_seen.add(out)
     if primed is not True:
-        print(f"Waiting for new status updates.")
+        print(f"Old events discarded. Waiting for updates.")
         primed = True
     for i in [ '█', '▇', '▆', '▅', '▄', '▃', '▂', '▁' ]:
         print(i, end='', flush=True)
