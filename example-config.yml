@@ -3,4 +3,7 @@ my-corpo-gitlab:
   type: 'gitlab'
   url: 'https://git.example.com'
   token: 'glpat-asdfjkl['
+  projects:
+    - 'foo/bar'
+    - 'bar/baz'
 # vim: filetype=yaml

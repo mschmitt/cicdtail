@@ -33,13 +33,18 @@ print(f"Loaded configuration from: {args.cfg}")
 ic('Top level configuration keys:', configuration.keys())
 
 gitlab_handle = {}
+gitlab_watched = set()
 for name, conf in configuration.items():
     print(f"Processing configuration section: {name}")
     ic(name, conf)
     if conf['type'] == 'gitlab':
         gitlab_handle[name] = gitlab.Gitlab(conf['url'], private_token=conf['token'])
+        for project_name in conf['projects']:
+            ic(project_name)
+            project = ic(gitlab_handle[name].projects.get(project_name))
+            gitlab_watched.add(project)
+            print(f"Watching project {project.path_with_namespace} on {name}.")
 
-gitlab_watched = set()
 out_seen = set()
 primed = False # Don't print initial batch of jobs
 while True:
@@ -48,12 +53,6 @@ while True:
             handle.auth()
         except Exception as e:
             print(f"Failed to authenticate to gitlab {name}: {e}")
-
-        # https://docs.gitlab.com/ee/api/members.html#roles
-        for project in handle.projects.list(min_access_level=30, get_all=True):
-            if project not in gitlab_watched:
-                ic(gitlab_watched.add(project))
-                print(f"Watching project {project.path_with_namespace} on {name}.")
 
         for project in gitlab_watched:
             projectname = project.path
@@ -83,5 +82,6 @@ while True:
         print(f"Waiting for new status updates.")
         primed = True
     for i in [ '█', '▇', '▆', '▅', '▄', '▃', '▂', '▁' ]:
-        print(f"{i}\b", end='', flush=True)
+        print(i, end='', flush=True)
         time.sleep(0.5)
+        print("\b", end='', flush=True)
