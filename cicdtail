@@ -41,9 +41,12 @@ for name, conf in configuration.items():
         gitlab_handle[name] = gitlab.Gitlab(conf['url'], private_token=conf['token'])
         for project_name in conf['projects']:
             ic(project_name)
-            project = ic(gitlab_handle[name].projects.get(project_name))
-            gitlab_watched.add(project)
-            print(f"Watching project {project.path_with_namespace} on {name}.")
+            try:
+                project = ic(gitlab_handle[name].projects.get(project_name))
+                gitlab_watched.add(project)
+                print(f"Watching project {project.path_with_namespace} on {name}.")
+            except Exception as e:
+                print(f"Failed to watch project {project_name}: {e}")
 
 out_seen = set()
 primed = False # Don't print initial batch of jobs
